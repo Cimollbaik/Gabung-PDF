@@ -85,7 +85,7 @@ svg{display:block}
 <main>
 <header>
   <h1>Gabung PDF</h1>
-  <p class="lead">Satukan surat, CV, KTP, ijazah, dan transkrip menjadi satu file PDF yang rapi.</p>
+  <p class="lead">Satukan surat, CV, KTP, ijazah, dan transkrip menjadi satu file PDF yang rapi. Semua halaman otomatis disamakan jadi A4 tegak.</p>
 </header>
 
 <ol class="steps" id="steps">
@@ -210,20 +210,35 @@ function imgToJpeg(f){
 
 async function merge(){
   var PD=PDFLib.PDFDocument,doc=await PD.create();
+  var PW=595.28,PH=841.89,M=28;           // semua halaman: A4 tegak
   for(var i=0;i<items.length;i++){
     var f=items[i].file;
     say('Memproses '+(i+1)+' dari '+items.length+': '+f.name);
     if(isPdf(f)){
-      var buf=await readBuf(f),src;
-      try{src=await PD.load(buf,{ignoreEncryption:true})}
+      var buf=await readBuf(f),src,emb;
+      try{src=await PD.load(buf,{ignoreEncryption:true});emb=await doc.embedPdf(src,src.getPageIndices())}
       catch(e){throw new Error('File "'+f.name+'" rusak atau dikunci, tidak bisa dibaca.')}
-      var pgs=await doc.copyPages(src,src.getPageIndices());
-      pgs.forEach(function(p){doc.addPage(p)});
+      for(var k=0;k<emb.length;k++){
+        var sp=src.getPage(k),sz=sp.getSize(),rw=sz.width,rh=sz.height;
+        var ang=((sp.getRotation().angle%360)+360)%360;
+        var ew=(ang===90||ang===270)?rh:rw, eh=(ang===90||ang===270)?rw:rh;
+        var nearA4=ang===0&&Math.abs(ew/eh-PW/PH)<0.02;
+        var m=nearA4?0:M;
+        var sc=Math.min((PW-2*m)/ew,(PH-2*m)/eh);
+        var dw=ew*sc,dh=eh*sc,X=(PW-dw)/2,Y=(PH-dh)/2;
+        var pg=doc.addPage([PW,PH]);
+        var o={width:rw*sc,height:rh*sc};
+        if(ang===0){o.x=X;o.y=Y}
+        else if(ang===90){o.x=X;o.y=Y+rw*sc;o.rotate=PDFLib.degrees(-90)}
+        else if(ang===180){o.x=X+rw*sc;o.y=Y+rh*sc;o.rotate=PDFLib.degrees(180)}
+        else{o.x=X+rh*sc;o.y=Y;o.rotate=PDFLib.degrees(90)}
+        pg.drawPage(emb[k],o);
+      }
     }else{
       var im=await imgToJpeg(f),jpg=await doc.embedJpg(im.buf);
-      var PW=595.28,PH=841.89,M=28,sc=Math.min((PW-2*M)/im.w,(PH-2*M)/im.h);
-      var dw=im.w*sc,dh=im.h*sc,pg=doc.addPage([PW,PH]);
-      pg.drawImage(jpg,{x:(PW-dw)/2,y:(PH-dh)/2,width:dw,height:dh});
+      var sc2=Math.min((PW-2*M)/im.w,(PH-2*M)/im.h);
+      var iw=im.w*sc2,ih=im.h*sc2,pg2=doc.addPage([PW,PH]);
+      pg2.drawImage(jpg,{x:(PW-iw)/2,y:(PH-ih)/2,width:iw,height:ih});
     }
   }
   say('Menyimpan hasil...');
