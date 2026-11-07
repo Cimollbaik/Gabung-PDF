@@ -75,6 +75,7 @@ ul.files{list-style:none;margin:16px 0 0;padding:0}
 .res a,.res button{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:16px;border-radius:14px;font-size:16px;font-weight:700;text-decoration:none;border:0;cursor:pointer;margin-top:8px;font-family:inherit}
 .res .dl{background:var(--ok);color:#fff;font-size:18px}
 .res .sec{background:var(--bg);color:var(--ink);border:1px solid var(--line)}
+.res .tip{margin:14px 0 0;font-size:13px}
 .foot{margin:26px 2px 0;color:var(--sub);font-size:13px;display:flex;gap:8px;align-items:flex-start}
 svg{display:block}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
@@ -122,7 +123,7 @@ svg{display:block}
 
 <script>
 (function(){
-var items=[],uid=0,outUrl=null,outBlob=null,outName='';
+var items=[],uid=0,outUrl=null,dlUrl=null,outBlob=null,outName='';
 var $=function(i){return document.getElementById(i)};
 var list=$('list'),go=$('go'),msg=$('msg'),out=$('out'),tools=$('tools');
 
@@ -165,7 +166,7 @@ function render(){
   if(!outUrl)setStep(items.length?2:1);
 }
 function mv(i,d){var j=i+d;if(j<0||j>=items.length)return;var t=items[i];items[i]=items[j];items[j]=t;reset();render()}
-function reset(){out.innerHTML='';if(outUrl){URL.revokeObjectURL(outUrl);outUrl=null}outBlob=null;say('')}
+function reset(){out.innerHTML='';if(outUrl){URL.revokeObjectURL(outUrl);outUrl=null}if(dlUrl){URL.revokeObjectURL(dlUrl);dlUrl=null}outBlob=null;say('')}
 
 $('clear').onclick=function(){items=[];reset();render()};
 
@@ -235,9 +236,10 @@ function showResult(){
   out.innerHTML='<div class="res"><div class="tick">'+IC.ck+'</div><h2>PDF siap disimpan</h2><p></p>'+
    '<a class="dl" id="dl">'+IC.dl+'Download PDF</a>'+
    (canShare?'<button type="button" class="sec" id="sh">'+IC.sh+'Bagikan / Simpan ke Files</button>':'')+
-   '<a class="sec" id="op" target="_blank" rel="noopener">'+IC.ey+'Buka untuk dicek</a></div>';
+   '<a class="sec" id="op" target="_blank" rel="noopener">'+IC.ey+'Buka untuk dicek</a>'+
+   '<p class="tip">Kalau file malah terbuka di pratinjau, ketuk ikon bagikan di pratinjau, lalu pilih <b>Simpan ke File</b>.</p></div>';
   out.querySelector('p').textContent=outName+' · '+fmt(outBlob.size);
-  var a=$('dl');a.href=outUrl;a.download=outName;
+  var a=$('dl');a.href=dlUrl;a.download=outName;
   $('op').href=outUrl;
   if(canShare)$('sh').onclick=function(){
     navigator.share({files:[new File([outBlob],outName,{type:'application/pdf'})],title:outName}).catch(function(){});
@@ -253,6 +255,7 @@ go.addEventListener('click',async function(){
     var bytes=await merge();
     outBlob=new Blob([bytes],{type:'application/pdf'});
     outUrl=URL.createObjectURL(outBlob);
+    dlUrl=URL.createObjectURL(new Blob([bytes],{type:'application/octet-stream'}));
     var n=($('nm').value||'Gabungan').replace(/\.pdf$/i,'').replace(/[\\\/:*?"<>|]+/g,'').trim()||'Gabungan';
     outName=n+'.pdf';
     say('');showResult();
